@@ -4,6 +4,7 @@ import logging
 import argparse
 import pickle
 import os
+from sklearn.metrics import f1_score
 from PIL import Image
 from tqdm import tqdm
 import torch
@@ -45,7 +46,7 @@ def get_argument():
                         help="learning rate")
     opt.add_argument("--epochs",
                         type=int,
-                        default=1,
+                        default=5,
                         help="epochs")
     config = vars(opt.parse_args())
     return config
@@ -144,6 +145,8 @@ if __name__ == '__main__':
 
     train_dataset = MultiModalDataset(nlp_tokenizer=deberta_tokenizer, nlp_pretrained=deberta, cv_pretrained=vgg19_model, mode='train')
     train_dataloader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True, num_workers=8)
+    val_dataset = MultiModalDataset(nlp_tokenizer=deberta_tokenizer, nlp_pretrained=deberta, cv_pretrained=vgg19_model, mode='val')
+    val_dataloader = DataLoader(val_dataset, batch_size=config['batch_size'], shuffle=False, num_workers=8)
 
     # print(sum(p.numel() for p in deberta.parameters() if p.requires_grad))
     # print(sum(p.numel() for p in vgg19_model.parameters() if p.requires_grad))
@@ -153,7 +156,7 @@ if __name__ == '__main__':
     pbar = tqdm(range(config['epochs']), desc='Epoch: ')
     for epoch in pbar:
         fake_net.train()
-        total_loss = 0
+        total_loss, best_val_f1 = 0, 0
         for loader_idx, item in tqdm(enumerate(train_dataloader), total=len(train_dataloader)):
             # # transform sentences to embeddings via DeBERTa
             # input_claim = tokenizer(row['claim'], truncation=True, padding=True, return_tensors="pt").to(device)
@@ -209,5 +212,47 @@ if __name__ == '__main__':
             total_loss += current_loss
             pbar.set_description("Loss: {}".format(round(current_loss, 3)), refresh=True)
 
+        # testing
+        y_pred, y_true = [], []
+        fake_net.eval()
+        total_loss = 0
+        for loader_idx, item in tqdm(enumerate(val_dataloader), total=len(val_dataloader)):
+            claim_text, claim_image, document_text, document_image, label = item[0], item[1].to(device), item[2], item[3].to(device), item[4]
+
+            # transform sentences to embeddings via DeBERTa
+            input_claim = deberta_tokenizer(claim_text, truncation=True, padding=True, return_tensors="pt").to(device)
+            output_claim = deberta(**input_claim)
+            output_claim_text = output_claim.last_hidden_state[:, 0, :]
+
+            input_document = deberta_tokenizer(document_text, truncation=True, padding=True, return_tensors="pt").to(device)
+            output_document = deberta(**input_document)
+            output_document_text = output_document.last_hidden_state[:, 0, :]
+
+            output_claim_image = vgg19_model(claim_image)
+
+            output_document_image = vgg19_model(document_image)
+
+            predicted_output = fake_net(output_claim_text, output_claim_image, output_document_text, output_document_image)
+            
+            _, predicted_label = torch.topk(predicted_output, 1)
+
+            if len(y_pred) == 0:
+                y_pred = predicted_label.cpu().detach().flatten().tolist()
+                y_true = label.tolist()
+            else:
+                y_pred += predicted_label.cpu().detach().flatten().tolist()
+                y_true += label.tolist()
+
+        f1 = round(f1_score(y_true, y_pred, average='weighted'), 5)
+
+        if f1 >= best_val_f1:
+            best_val_f1 = f1
+            save(fake_net, config, epoch=epoch)
+
+        with open(config['output_folder_name'] + 'record', 'a') as config_file:
+            config_file.write(str(epoch) + ',' + str(f1))
+            config_file.write('\n')
+
     config['total_loss'] = total_loss
+    config['val_f1'] = best_val_f1
     save(fake_net, config)

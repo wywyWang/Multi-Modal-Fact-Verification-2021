@@ -63,7 +63,7 @@ class MultiModalDataset(Dataset):
 
 if __name__ == '__main__':
     model_path = sys.argv[1]
-    config = ast.literal_eval(open(model_path + 'config').readline())
+    config = ast.literal_eval(open(model_path + '3config').readline())
     set_seed(config['seed_value'])
 
     df_val = pd.read_csv('../data/val.csv', index_col='Id')[['claim', 'claim_image', 'document', 'document_image', 'Category']]
@@ -75,6 +75,14 @@ if __name__ == '__main__':
         'Insufficient_Multimodal': 2,
         'Insufficient_Text': 3,
         'Refute': 4
+    }
+    
+    inverse_category = {
+        0: 'Support_Multimodal',
+        1: 'Support_Text',
+        2: 'Insufficient_Multimodal',
+        3: 'Insufficient_Text',
+        4: 'Refute'
     }
 
     df_val['Label'] = df_val['Category'].map(category)
@@ -93,7 +101,7 @@ if __name__ == '__main__':
 
     fake_net = FakeNet()
 
-    fake_net.load_state_dict(torch.load(model_path + 'model'))
+    fake_net.load_state_dict(torch.load(model_path + '3model'))
 
     deberta.to(device)
     vgg19_model.to(device)
@@ -104,34 +112,41 @@ if __name__ == '__main__':
 
     # testing
     y_pred, y_true = [], []
-    pbar = tqdm(range(config['epochs']), desc='Epoch: ')
-    for epoch in pbar:
-        fake_net.eval()
-        total_loss = 0
-        for loader_idx, item in tqdm(enumerate(val_dataloader), total=len(val_dataloader)):
-            claim_text, claim_image, document_text, document_image, label = item[0], item[1].to(device), item[2], item[3].to(device), item[4]
+    fake_net.eval()
+    total_loss = 0
+    for loader_idx, item in tqdm(enumerate(val_dataloader), total=len(val_dataloader)):
+        claim_text, claim_image, document_text, document_image, label = item[0], item[1].to(device), item[2], item[3].to(device), item[4]
 
-            # transform sentences to embeddings via DeBERTa
-            input_claim = deberta_tokenizer(claim_text, truncation=True, padding=True, return_tensors="pt").to(device)
-            output_claim = deberta(**input_claim)
-            output_claim_text = output_claim.last_hidden_state[:, 0, :]
+        # transform sentences to embeddings via DeBERTa
+        input_claim = deberta_tokenizer(claim_text, truncation=True, padding=True, return_tensors="pt").to(device)
+        output_claim = deberta(**input_claim)
+        output_claim_text = output_claim.last_hidden_state[:, 0, :]
 
-            input_document = deberta_tokenizer(document_text, truncation=True, padding=True, return_tensors="pt").to(device)
-            output_document = deberta(**input_document)
-            output_document_text = output_document.last_hidden_state[:, 0, :]
+        input_document = deberta_tokenizer(document_text, truncation=True, padding=True, return_tensors="pt").to(device)
+        output_document = deberta(**input_document)
+        output_document_text = output_document.last_hidden_state[:, 0, :]
 
-            output_claim_image = vgg19_model(claim_image)
+        output_claim_image = vgg19_model(claim_image)
 
-            output_document_image = vgg19_model(document_image)
+        output_document_image = vgg19_model(document_image)
 
-            predicted_output = fake_net(output_claim_text, output_claim_image, output_document_text, output_document_image)
-            
-            _, predicted_label = torch.topk(predicted_output, 1)
+        predicted_output = fake_net(output_claim_text, output_claim_image, output_document_text, output_document_image)
+        
+        _, predicted_label = torch.topk(predicted_output, 1)
 
-            y_pred.append(predicted_label.cpu().detach().numpy().flatten()), y_true.append(label.tolist())
+        if len(y_pred) == 0:
+            y_pred = predicted_label.cpu().detach().flatten().tolist()
+            y_true = label.tolist()
+        else:
+            y_pred += predicted_label.cpu().detach().flatten().tolist()
+            y_true += label.tolist()
 
-    f1 = f1_score(y_true, y_pred, average='weighted')
-    results = pd.read_csv('record.csv')
+    f1 = round(f1_score(y_true, y_pred, average='weighted'), 5)
+    
     with open('record.csv', 'a') as config_file:
         config_file.write(model_path + ',' + str(f1))
         config_file.write('\n')
+
+    answer = pd.DataFrame(y_pred, columns =['Category'])
+    answer['Category'] = answer['Category'].map(inverse_category)
+    answer.to_csv('{}answer.csv'.format(config['output_folder_name']))
