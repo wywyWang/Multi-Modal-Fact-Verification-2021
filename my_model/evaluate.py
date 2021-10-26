@@ -26,7 +26,7 @@ MODEL_TYPE = "deberta"
 PRETRAINED_PATH = 'microsoft/deberta-base'
 OUTPUT_PATH = './models/deberta_base_1/'
 MAX_SEQUENCE_LENGTH = 512
-device = torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
 
 
 def set_seed(seed_value):
@@ -101,7 +101,7 @@ if __name__ == '__main__':
 
     fake_net = FakeNet()
 
-    fake_net.load_state_dict(torch.load(model_path + '3model'))
+    fake_net.load_state_dict(torch.load(model_path + 'model'))
 
     deberta.to(device)
     vgg19_model.to(device)

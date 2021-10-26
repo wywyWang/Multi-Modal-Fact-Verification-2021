@@ -24,7 +24,7 @@ MODEL_TYPE = "deberta"
 PRETRAINED_PATH = 'microsoft/deberta-base'
 OUTPUT_PATH = './models/deberta_base_1/'
 MAX_SEQUENCE_LENGTH = 512
-device = torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
 
 
 def get_argument():
@@ -46,7 +46,7 @@ def get_argument():
                         help="learning rate")
     opt.add_argument("--epochs",
                         type=int,
-                        default=5,
+                        default=50,
                         help="epochs")
     config = vars(opt.parse_args())
     return config
@@ -135,6 +135,9 @@ if __name__ == '__main__':
         param.requires_grad = False
 
     fake_net = FakeNet()
+    
+    # fake_net.load_state_dict(torch.load('model/20211025-125308_/model'))
+
     criterion = nn.CrossEntropyLoss()
     fake_net_optimizer = torch.optim.Adam(fake_net.parameters(), lr=5e-5)
 
@@ -158,35 +161,6 @@ if __name__ == '__main__':
         fake_net.train()
         total_loss, best_val_f1 = 0, 0
         for loader_idx, item in tqdm(enumerate(train_dataloader), total=len(train_dataloader)):
-            # # transform sentences to embeddings via DeBERTa
-            # input_claim = tokenizer(row['claim'], truncation=True, padding=True, return_tensors="pt").to(device)
-            # output_claim = model(**input_claim)
-            # claim_embedding = output_claim.last_hidden_state[:, 0, :]
-            # claim_text_embedding = nlp_model(claim_embedding)
-
-            # input_document = tokenizer(row['document'], truncation=True, padding=True, return_tensors="pt").to(device)
-            # output_document = model(**input_document)
-            # document_embedding = output_document.last_hidden_state[:, 0, :]
-            # document_text_embedding = nlp_model(document_embedding)
-
-            # # transform images to embeddings via VGG-19
-            # path = '../data/train/'
-            # filename = path + 'claim/' + row['Category'] + '/' + str(i) + '.jpg'
-            # input_claim_image = Image.open(filename)
-            # input_tensor = preprocess(input_claim_image).to(device)
-            # input_batch = input_tensor.unsqueeze(0)
-            # claim_image_embedding = cv_model(vgg19_model(input_batch))
-
-            # filename = path + 'document/' + row['Category'] + '/' + str(i) + '.jpg'
-            # input_document_image = Image.open(filename)
-            # input_tensor = preprocess(input_document_image).to(device)
-            # input_batch = input_tensor.unsqueeze(0)
-            # document_image_embedding = cv_model(vgg19_model(input_batch))
-
-            # # print(claim_image_embedding.shape, document_image_embedding.shape)
-            # # print(claim_embedding.shape, document_embedding.shape)
-
-
             claim_text, claim_image, document_text, document_image, label = item[0], item[1].to(device), item[2], item[3].to(device), item[4].to(device)
 
             # transform sentences to embeddings via DeBERTa
@@ -215,7 +189,6 @@ if __name__ == '__main__':
         # testing
         y_pred, y_true = [], []
         fake_net.eval()
-        total_loss = 0
         for loader_idx, item in tqdm(enumerate(val_dataloader), total=len(val_dataloader)):
             claim_text, claim_image, document_text, document_image, label = item[0], item[1].to(device), item[2], item[3].to(device), item[4]
 
@@ -250,7 +223,7 @@ if __name__ == '__main__':
             save(fake_net, config, epoch=epoch)
 
         with open(config['output_folder_name'] + 'record', 'a') as config_file:
-            config_file.write(str(epoch) + ',' + str(f1))
+            config_file.write(str(epoch) + ',' + str(round(total_loss, 5)) + ',' + str(f1))
             config_file.write('\n')
 
     config['total_loss'] = total_loss
