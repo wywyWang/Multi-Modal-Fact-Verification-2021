@@ -1,4 +1,4 @@
-from transformers import DebertaTokenizer, DebertaModel
+from transformers import DebertaTokenizer, DebertaModel, ViTModel, ViTFeatureExtractor, DeiTFeatureExtractor
 import pandas as pd
 import logging
 import argparse
@@ -22,6 +22,7 @@ transformers_logger.setLevel(logging.ERROR)
 
 MODEL_TYPE = "deberta"
 PRETRAINED_PATH = 'microsoft/deberta-base'
+CV_PRETRAINED_PATH = 'facebook/deit-base-patch16-224'
 MAX_SEQUENCE_LENGTH = 512
 device = torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
 
@@ -37,7 +38,7 @@ def get_argument():
                         help="seed value")
     opt.add_argument("--batch_size",
                         type=int,
-                        default=32,
+                        default=64,
                         help="batch size")
     opt.add_argument("--lr",
                         type=int,
@@ -45,7 +46,7 @@ def get_argument():
                         help="learning rate")
     opt.add_argument("--epochs",
                         type=int,
-                        default=25,
+                        default=40,
                         help="epochs")
     config = vars(opt.parse_args())
     return config
@@ -58,19 +59,15 @@ def set_seed(seed_value):
 
 
 class MultiModalDataset(Dataset):
-    def __init__(self, nlp_tokenizer, nlp_pretrained, cv_pretrained, mode='train'):
+    def __init__(self, mode='train'):
         super().__init__()
 
-        preprocess = transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.229, 0.224, 0.225]),
-        ])
-
-        self.nlp_tokenizer = nlp_tokenizer
-        self.nlp_pretrained = nlp_pretrained
-        self.cv_pretrained = cv_pretrained
+        # preprocess = transforms.Compose([
+        #     transforms.Resize(256),
+        #     transforms.CenterCrop(224),
+        #     transforms.ToTensor(),
+        #     transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.229, 0.224, 0.225]),
+        # ])
 
         with open('../my_model/processed_{}.pickle'.format(mode), 'rb') as f:
             self.data = pickle.load(f)
@@ -128,10 +125,17 @@ if __name__ == '__main__':
         param.requires_grad = False
 
     # load pretrained CV model
-    vgg19_model = models.vgg19(pretrained=True)
-    vgg19_model.classifier = vgg19_model.classifier[:-1]
-    for param in vgg19_model.parameters():
+    # vgg19_model = models.vgg19(pretrained=True)
+    # vgg19_model.classifier = vgg19_model.classifier[:-1]
+    # for param in vgg19_model.parameters():
+    #     param.requires_grad = False
+
+    # feature_extractor = DeiTFeatureExtractor.from_pretrained(CV_PRETRAINED_PATH)
+    vit_model = ViTModel.from_pretrained(CV_PRETRAINED_PATH)
+    for param in vit_model.parameters():
         param.requires_grad = False
+
+    print(sum(p.numel() for p in vit_model.parameters() if p.requires_grad))
 
     fake_net = FakeNet()
     
@@ -141,13 +145,14 @@ if __name__ == '__main__':
     fake_net_optimizer = torch.optim.Adam(fake_net.parameters(), lr=5e-5)
 
     deberta.to(device)
-    vgg19_model.to(device)
+    # vgg19_model.to(device)
+    vit_model.to(device)
     fake_net.to(device)
     criterion.to(device)
 
-    train_dataset = MultiModalDataset(nlp_tokenizer=deberta_tokenizer, nlp_pretrained=deberta, cv_pretrained=vgg19_model, mode='train')
+    train_dataset = MultiModalDataset(mode='train')
     train_dataloader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True, num_workers=8)
-    val_dataset = MultiModalDataset(nlp_tokenizer=deberta_tokenizer, nlp_pretrained=deberta, cv_pretrained=vgg19_model, mode='val')
+    val_dataset = MultiModalDataset(mode='val')
     val_dataloader = DataLoader(val_dataset, batch_size=config['batch_size'], shuffle=False, num_workers=8)
 
     # print(sum(p.numel() for p in deberta.parameters() if p.requires_grad))
@@ -171,8 +176,16 @@ if __name__ == '__main__':
             output_document = deberta(**input_document)
             output_document_text = output_document.last_hidden_state
 
-            output_claim_image = vgg19_model(claim_image)
-            output_document_image = vgg19_model(document_image)
+            # output_claim_image = vgg19_model(claim_image)
+            # output_document_image = vgg19_model(document_image)
+
+            # input_claim_image = feature_extractor(images=claim_image, return_tensors="pt").to(device)
+            output_claim_image = vit_model(claim_image)
+            output_claim_image = output_claim_image.last_hidden_state
+
+            # input_document_image = feature_extractor(images=document_image, return_tensors="pt").to(device)
+            output_document_image = vit_model(document_image)
+            output_document_image = output_document_image.last_hidden_state
 
             predicted_output = fake_net(output_claim_text, output_claim_image, output_document_text, output_document_image)
             
@@ -199,8 +212,16 @@ if __name__ == '__main__':
             output_document = deberta(**input_document)
             output_document_text = output_document.last_hidden_state
 
-            output_claim_image = vgg19_model(claim_image)
-            output_document_image = vgg19_model(document_image)
+            # output_claim_image = vgg19_model(claim_image)
+            # output_document_image = vgg19_model(document_image)
+
+            # input_claim_image = feature_extractor(images=claim_image, return_tensors="pt").to(device)
+            output_claim_image = vit_model(claim_image)
+            output_claim_image = output_claim_image.last_hidden_state
+
+            # input_document_image = feature_extractor(images=document_image, return_tensors="pt").to(device)
+            output_document_image = vit_model(document_image)
+            output_document_image = output_document_image.last_hidden_state
 
             predicted_output = fake_net(output_claim_text, output_claim_image, output_document_text, output_document_image)
             
