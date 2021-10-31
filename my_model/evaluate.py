@@ -1,4 +1,6 @@
-from transformers import DebertaTokenizer, DebertaModel, ViTModel, DeiTFeatureExtractor
+# from transformers import DebertaTokenizer, DebertaModel
+from transformers import XLMRobertaTokenizer, XLMRobertaModel
+from transformers import ViTModel
 import pandas as pd
 import logging
 import ast
@@ -23,11 +25,12 @@ transformers_logger = logging.getLogger("transformers")
 transformers_logger.setLevel(logging.ERROR)
 
 MODEL_TYPE = "deberta"
-PRETRAINED_PATH = 'microsoft/deberta-base'
+# PRETRAINED_PATH = 'microsoft/deberta-base'
+PRETRAINED_PATH = 'xlm-roberta-base'
 CV_PRETRAINED_PATH = 'facebook/deit-base-patch16-224'
 OUTPUT_PATH = './models/deberta_base_1/'
 MAX_SEQUENCE_LENGTH = 512
-device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
 
 
 def set_seed(seed_value):
@@ -85,12 +88,13 @@ if __name__ == '__main__':
     df_val['Label'] = df_val['Category'].map(category)
 
     # load pretrained NLP model
-    deberta_tokenizer = DebertaTokenizer.from_pretrained(PRETRAINED_PATH)
-    deberta = DebertaModel.from_pretrained(PRETRAINED_PATH)
+    # deberta_tokenizer = DebertaTokenizer.from_pretrained(PRETRAINED_PATH)
+    # deberta = DebertaModel.from_pretrained(PRETRAINED_PATH)
+    deberta_tokenizer = XLMRobertaTokenizer.from_pretrained(PRETRAINED_PATH)
+    deberta = XLMRobertaModel.from_pretrained(PRETRAINED_PATH)
     for param in deberta.parameters():
         param.requires_grad = False
 
-    # feature_extractor = DeiTFeatureExtractor.from_pretrained(CV_PRETRAINED_PATH)
     vit_model = ViTModel.from_pretrained(CV_PRETRAINED_PATH)
     for param in vit_model.parameters():
         param.requires_grad = False
@@ -122,31 +126,30 @@ if __name__ == '__main__':
         output_document = deberta(**input_document)
         output_document_text = output_document.last_hidden_state
 
-        # input_claim_image = feature_extractor(images=claim_image, return_tensors="pt").to(device)
         output_claim_image = vit_model(claim_image)
         output_claim_image = output_claim_image.last_hidden_state
 
-        # input_document_image = feature_extractor(images=document_image, return_tensors="pt").to(device)
         output_document_image = vit_model(document_image)
         output_document_image = output_document_image.last_hidden_state
 
         predicted_output = fake_net(output_claim_text, output_claim_image, output_document_text, output_document_image)
-        
-        _, predicted_label = torch.topk(predicted_output, 1)
+        softmax = nn.Softmax(dim=1)
+        predicted_output = softmax(predicted_output)
+        # _, predicted_label = torch.topk(predicted_output, 1)
 
         if len(y_pred) == 0:
-            y_pred = predicted_label.cpu().detach().flatten().tolist()
+            y_pred = predicted_output.cpu().detach().tolist()
             y_true = label.tolist()
         else:
-            y_pred += predicted_label.cpu().detach().flatten().tolist()
+            y_pred += predicted_output.cpu().detach().tolist()
             y_true += label.tolist()
 
-    f1 = round(f1_score(y_true, y_pred, average='weighted'), 5)
+    # f1 = round(f1_score(y_true, y_pred, average='weighted'), 5)
     
-    with open('record.csv', 'a') as config_file:
-        config_file.write(model_path + ',' + str(f1))
-        config_file.write('\n')
+    # with open('record.csv', 'a') as config_file:
+    #     config_file.write(model_path + ',' + str(f1))
+    #     config_file.write('\n')
 
-    answer = pd.DataFrame(y_pred, columns =['Category'])
-    answer['Category'] = answer['Category'].map(inverse_category)
+    answer = pd.DataFrame(y_pred, columns=category.keys())
+    # answer['Category'] = answer['Category'].map(inverse_category)
     answer.to_csv('{}answer.csv'.format(config['output_folder_name']))
