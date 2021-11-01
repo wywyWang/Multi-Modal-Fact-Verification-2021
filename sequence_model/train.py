@@ -1,4 +1,5 @@
-from transformers import DebertaTokenizer, DebertaModel, ViTModel, ViTFeatureExtractor, DeiTFeatureExtractor
+from transformers import DebertaTokenizer, DebertaModel, ViTModel
+# from transformers import CLIPModel, CLIPTokenizer
 import pandas as pd
 import logging
 import argparse
@@ -23,6 +24,7 @@ transformers_logger.setLevel(logging.ERROR)
 MODEL_TYPE = "deberta"
 PRETRAINED_PATH = 'microsoft/deberta-base'
 CV_PRETRAINED_PATH = 'facebook/deit-base-patch16-224'
+CLIP_PRETRAINED_PATH = 'openai/clip-vit-base-patch32'
 MAX_SEQUENCE_LENGTH = 512
 device = torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
 
@@ -38,11 +40,11 @@ def get_argument():
                         help="seed value")
     opt.add_argument("--batch_size",
                         type=int,
-                        default=64,
+                        default=20,
                         help="batch size")
     opt.add_argument("--lr",
                         type=int,
-                        default=5e-5,
+                        default=4e-5,
                         help="learning rate")
     opt.add_argument("--epochs",
                         type=int,
@@ -124,28 +126,24 @@ if __name__ == '__main__':
     for param in deberta.parameters():
         param.requires_grad = False
 
-    # load pretrained CV model
-    # vgg19_model = models.vgg19(pretrained=True)
-    # vgg19_model.classifier = vgg19_model.classifier[:-1]
-    # for param in vgg19_model.parameters():
-    #     param.requires_grad = False
-
-    # feature_extractor = DeiTFeatureExtractor.from_pretrained(CV_PRETRAINED_PATH)
     vit_model = ViTModel.from_pretrained(CV_PRETRAINED_PATH)
     for param in vit_model.parameters():
         param.requires_grad = False
 
-    print(sum(p.numel() for p in vit_model.parameters() if p.requires_grad))
-
+    # # load CLIP
+    # clip_tokenizer = CLIPTokenizer.from_pretrained(CLIP_PRETRAINED_PATH)
+    # clip_model = CLIPModel.from_pretrained(CLIP_PRETRAINED_PATH)
+    # for param in clip_model.parameters():
+    #     param.requires_grad = False
+    
     fake_net = FakeNet()
     
     # fake_net.load_state_dict(torch.load('model/20211025-125308_/model'))
 
     criterion = nn.CrossEntropyLoss()
-    fake_net_optimizer = torch.optim.Adam(fake_net.parameters(), lr=5e-5)
+    fake_net_optimizer = torch.optim.Adam(fake_net.parameters(), lr=config['lr'])
 
     deberta.to(device)
-    # vgg19_model.to(device)
     vit_model.to(device)
     fake_net.to(device)
     criterion.to(device)
@@ -165,6 +163,7 @@ if __name__ == '__main__':
         fake_net.train()
         total_loss, best_val_f1 = 0, 0
         for loader_idx, item in enumerate(train_dataloader):
+            fake_net_optimizer.zero_grad()
             claim_text, claim_image, document_text, document_image, label = item[0], item[1].to(device), item[2], item[3].to(device), item[4].to(device)
 
             # transform sentences to embeddings via DeBERTa
@@ -176,14 +175,10 @@ if __name__ == '__main__':
             output_document = deberta(**input_document)
             output_document_text = output_document.last_hidden_state
 
-            # output_claim_image = vgg19_model(claim_image)
-            # output_document_image = vgg19_model(document_image)
-
-            # input_claim_image = feature_extractor(images=claim_image, return_tensors="pt").to(device)
+            # transform images to embeddings via VIT
             output_claim_image = vit_model(claim_image)
             output_claim_image = output_claim_image.last_hidden_state
 
-            # input_document_image = feature_extractor(images=document_image, return_tensors="pt").to(device)
             output_document_image = vit_model(document_image)
             output_document_image = output_document_image.last_hidden_state
 
@@ -212,14 +207,10 @@ if __name__ == '__main__':
             output_document = deberta(**input_document)
             output_document_text = output_document.last_hidden_state
 
-            # output_claim_image = vgg19_model(claim_image)
-            # output_document_image = vgg19_model(document_image)
 
-            # input_claim_image = feature_extractor(images=claim_image, return_tensors="pt").to(device)
             output_claim_image = vit_model(claim_image)
             output_claim_image = output_claim_image.last_hidden_state
 
-            # input_document_image = feature_extractor(images=document_image, return_tensors="pt").to(device)
             output_document_image = vit_model(document_image)
             output_document_image = output_document_image.last_hidden_state
 
