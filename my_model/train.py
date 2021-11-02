@@ -1,4 +1,6 @@
-from transformers import DebertaTokenizer, DebertaModel, ViTModel, XLMRobertaTokenizer, XLMRobertaModel
+from transformers import ViTModel
+from transformers import DebertaTokenizer, DebertaModel
+# from transformers import XLMRobertaTokenizer, XLMRobertaModel
 import pandas as pd
 import logging
 import argparse
@@ -22,6 +24,7 @@ transformers_logger.setLevel(logging.ERROR)
 
 MODEL_TYPE = "deberta"
 PRETRAINED_PATH = 'microsoft/deberta-base'
+# PRETRAINED_PATH = 'xlm-roberta-base'
 CV_PRETRAINED_PATH = 'facebook/deit-base-patch16-224'
 MAX_SEQUENCE_LENGTH = 512
 device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
@@ -38,11 +41,11 @@ def get_argument():
                         help="seed value")
     opt.add_argument("--batch_size",
                         type=int,
-                        default=32,
+                        default=20,
                         help="batch size")
     opt.add_argument("--lr",
                         type=int,
-                        default=5e-5,
+                        default=2e-5,
                         help="learning rate")
     opt.add_argument("--epochs",
                         type=int,
@@ -124,14 +127,13 @@ if __name__ == '__main__':
     for param in deberta.parameters():
         param.requires_grad = False
 
-    # feature_extractor = DeiTFeatureExtractor.from_pretrained(CV_PRETRAINED_PATH)
     vit_model = ViTModel.from_pretrained(CV_PRETRAINED_PATH)
     for param in vit_model.parameters():
         param.requires_grad = False
 
     fake_net = FakeNet()
     
-    fake_net.load_state_dict(torch.load('model/20211101-002023_/19model'))
+    # fake_net.load_state_dict(torch.load('model/20211101-002023_/19model'))
 
     criterion = nn.CrossEntropyLoss()
     fake_net_optimizer = torch.optim.Adam(fake_net.parameters(), lr=config['lr'])
@@ -140,6 +142,7 @@ if __name__ == '__main__':
     vit_model.to(device)
     fake_net.to(device)
     criterion.to(device)
+    
 
     train_dataset = MultiModalDataset(mode='train')
     train_dataloader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True, num_workers=16)
@@ -201,14 +204,9 @@ if __name__ == '__main__':
             output_document = deberta(**input_document)
             output_document_text = output_document.last_hidden_state
 
-            # output_claim_image = vgg19_model(claim_image)
-            # output_document_image = vgg19_model(document_image)
-
-            # input_claim_image = feature_extractor(images=claim_image, return_tensors="pt").to(device)
             output_claim_image = vit_model(claim_image)
             output_claim_image = output_claim_image.last_hidden_state
 
-            # input_document_image = feature_extractor(images=document_image, return_tensors="pt").to(device)
             output_document_image = vit_model(document_image)
             output_document_image = output_document_image.last_hidden_state
 

@@ -36,13 +36,13 @@ class FakeNet(nn.Module):
         self.claim_document_image_attention = MultiHeadAttention(head, dim, dim, dim, dropout=dropout)
         self.claim_document_image_pos_ffn = PositionwiseFeedForward(dim, dim*2, dropout=dropout)
 
-        # self.text_image_attention = MultiHeadAttention(4, dim, dim, dim, dropout=dropout)
-        # self.text_image_pos_ffn = PositionwiseFeedForward(dim, dim*2, dropout=dropout)
-        # self.image_text_attention = MultiHeadAttention(4, dim, dim, dim, dropout=dropout)
-        # self.image_text_pos_ffn = PositionwiseFeedForward(dim, dim*2, dropout=dropout)
+        self.text_image_attention = MultiHeadAttention(4, dim, dim, dim, dropout=dropout)
+        self.text_image_pos_ffn = PositionwiseFeedForward(dim, dim*2, dropout=dropout)
+        self.image_text_attention = MultiHeadAttention(4, dim, dim, dim, dropout=dropout)
+        self.image_text_pos_ffn = PositionwiseFeedForward(dim, dim*2, dropout=dropout)
 
         self.classifier = nn.Sequential(
-            nn.Linear(dim*8, dim),
+            nn.Linear(dim*12, dim),
             nn.ReLU(),
             nn.Linear(dim, 128),
             nn.ReLU(),
@@ -67,16 +67,16 @@ class FakeNet(nn.Module):
         document_claim_image, _ = self.claim_document_image_attention(document_image_embedding, claim_image_embedding, claim_image_embedding)
         document_claim_image = self.claim_document_image_pos_ffn(document_claim_image)
 
-        # # text-image co-attention
-        # claim_text_image, _ = self.text_image_attention(claim_text_embedding, claim_image_embedding, claim_image_embedding)
-        # claim_text_image = self.text_image_pos_ffn(claim_text_image)
-        # claim_image_text, _ = self.image_text_attention(claim_image_embedding, claim_text_embedding, claim_text_embedding)
-        # claim_image_text = self.image_text_pos_ffn(claim_image_text)
+        # text-image co-attention
+        claim_text_image, _ = self.text_image_attention(claim_text_embedding, claim_image_embedding, claim_image_embedding)
+        claim_text_image = self.text_image_pos_ffn(claim_text_image)
+        claim_image_text, _ = self.image_text_attention(claim_image_embedding, claim_text_embedding, claim_text_embedding)
+        claim_image_text = self.image_text_pos_ffn(claim_image_text)
 
-        # document_text_image, _ = self.text_image_attention(document_text_embedding, document_image_embedding, document_image_embedding)
-        # document_text_image = self.text_image_pos_ffn(document_text_image)
-        # document_image_text, _ = self.image_text_attention(document_image_embedding, document_text_embedding, document_text_embedding)
-        # document_image_text = self.image_text_pos_ffn(document_image_text)
+        document_text_image, _ = self.text_image_attention(document_text_embedding, document_image_embedding, document_image_embedding)
+        document_text_image = self.text_image_pos_ffn(document_text_image)
+        document_image_text, _ = self.image_text_attention(document_image_embedding, document_text_embedding, document_text_embedding)
+        document_image_text = self.image_text_pos_ffn(document_image_text)
 
         # aggregate word and image embedding to sentence embedding
         claim_document_text = torch.mean(claim_document_text, dim=1)
@@ -88,11 +88,18 @@ class FakeNet(nn.Module):
         claim_image_embedding = torch.mean(claim_image_embedding, dim=1)
         document_image_embedding = torch.mean(document_image_embedding, dim=1)
 
+        claim_text_image = torch.mean(claim_text_image, dim=1)
+        claim_image_text = torch.mean(claim_image_text, dim=1)
+        document_text_image = torch.mean(document_text_image, dim=1)
+        document_image_text = torch.mean(document_image_text, dim=1)
+
         
         concat_embeddings = torch.cat((claim_text_embedding, claim_image_embedding,
                                        document_text_embedding, document_image_embedding,
                                        claim_document_text, document_claim_text,
-                                       claim_document_image, document_claim_image), dim=-1)
+                                       claim_document_image, document_claim_image,
+                                       claim_text_image, claim_image_text,
+                                       document_text_image, document_image_text), dim=-1)
 
         predicted_output = self.classifier(concat_embeddings)
         return predicted_output

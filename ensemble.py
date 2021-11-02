@@ -3,8 +3,8 @@ from tqdm import tqdm
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, f1_score
 
 model_path = {
-    'deberta_base': 'sequence_model/model/20211028-110027_/answer.csv',
-    'xlm_roberta_base': 'my_model/model/20211029-215340_/answer.csv'
+    'deberta_base': 'sequence_model/model/20211101-221315_/answer.csv',
+    'xlm_roberta_base': 'my_model/model/20211101-220613_/answer.csv'
 }
 model_count = len(model_path.keys())
 
@@ -23,11 +23,18 @@ for key, value in model_path.items():
 
 # ensemble
 answer = []
+ensemble_weight = [0.8, 0.2]
+POWER = 1/2
 for i in tqdm(range(len(df['deberta_base']))):
     prob = []
-    # 0 is index in dataframe
-    for prob_1, prob_2 in zip(df['deberta_base'].iloc[i].values.tolist()[1:], df['xlm_roberta_base'].iloc[i].values.tolist()[1:]):
-        prob.append((prob_1+prob_2)/model_count)
+    if model_count == 1:
+        for prob_1 in zip(df['deberta_base'].iloc[i].values.tolist()[1:]):
+            prob.append(prob_1)
+    else:
+        # 0 is index in dataframe
+        for prob_1, prob_2 in zip(df['deberta_base'].iloc[i].values.tolist()[1:], df['xlm_roberta_base'].iloc[i].values.tolist()[1:]):
+            current_prob = (prob_1**POWER) * ensemble_weight[0] + (prob_2**POWER) * ensemble_weight[1]
+            prob.append(current_prob)
 
     category = prob.index(max(prob))
     answer.append(inverse_category[category])

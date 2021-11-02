@@ -1,5 +1,5 @@
-# from transformers import DebertaTokenizer, DebertaModel
-from transformers import XLMRobertaTokenizer, XLMRobertaModel
+from transformers import DebertaTokenizer, DebertaModel
+# from transformers import XLMRobertaTokenizer, XLMRobertaModel
 from transformers import ViTModel
 import pandas as pd
 import logging
@@ -25,12 +25,12 @@ transformers_logger = logging.getLogger("transformers")
 transformers_logger.setLevel(logging.ERROR)
 
 MODEL_TYPE = "deberta"
-# PRETRAINED_PATH = 'microsoft/deberta-base'
-PRETRAINED_PATH = 'xlm-roberta-base'
+PRETRAINED_PATH = 'microsoft/deberta-base'
+# PRETRAINED_PATH = 'xlm-roberta-base'
 CV_PRETRAINED_PATH = 'facebook/deit-base-patch16-224'
 OUTPUT_PATH = './models/deberta_base_1/'
 MAX_SEQUENCE_LENGTH = 512
-device = torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
 
 
 def set_seed(seed_value):
@@ -88,10 +88,10 @@ if __name__ == '__main__':
     df_val['Label'] = df_val['Category'].map(category)
 
     # load pretrained NLP model
-    # deberta_tokenizer = DebertaTokenizer.from_pretrained(PRETRAINED_PATH)
-    # deberta = DebertaModel.from_pretrained(PRETRAINED_PATH)
-    deberta_tokenizer = XLMRobertaTokenizer.from_pretrained(PRETRAINED_PATH)
-    deberta = XLMRobertaModel.from_pretrained(PRETRAINED_PATH)
+    deberta_tokenizer = DebertaTokenizer.from_pretrained(PRETRAINED_PATH)
+    deberta = DebertaModel.from_pretrained(PRETRAINED_PATH)
+    # deberta_tokenizer = XLMRobertaTokenizer.from_pretrained(PRETRAINED_PATH)
+    # deberta = XLMRobertaModel.from_pretrained(PRETRAINED_PATH)
     for param in deberta.parameters():
         param.requires_grad = False
 
@@ -152,4 +152,4 @@ if __name__ == '__main__':
 
     answer = pd.DataFrame(y_pred, columns=category.keys())
     # answer['Category'] = answer['Category'].map(inverse_category)
-    answer.to_csv('{}answer.csv'.format(config['output_folder_name']))
+    answer.to_csv('{}answer.csv'.format(model_path))
