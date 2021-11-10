@@ -4,6 +4,14 @@ import torch.nn.functional as F
 from layers import MultiHeadAttention, PositionwiseFeedForward
 
 
+class Mish(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x):
+        return x * torch.tanh(F.softplus(x))
+
+
 class FakeNet(nn.Module):
     def __init__(self):
         super().__init__()
@@ -14,19 +22,23 @@ class FakeNet(nn.Module):
 
         self.text_embedding = nn.Sequential(
             nn.Linear(768, dim),
+            # Mish()
             nn.ReLU()
         )
         self.document_text_embedding = nn.Sequential(
             nn.Linear(768, dim),
+            # Mish()
             nn.ReLU()
         )
 
         self.image_embedding = nn.Sequential(
             nn.Linear(768, dim),
+            # Mish()
             nn.ReLU()
         )
         self.document_image_embedding = nn.Sequential(
             nn.Linear(768, dim),
+            # Mish()
             nn.ReLU()
         )
 
@@ -43,8 +55,10 @@ class FakeNet(nn.Module):
 
         self.classifier = nn.Sequential(
             nn.Linear(dim*12, dim),
+            # Mish(),
             nn.ReLU(),
             nn.Linear(dim, 128),
+            # Mish(),
             nn.ReLU(),
             nn.Linear(128, 5)
         )

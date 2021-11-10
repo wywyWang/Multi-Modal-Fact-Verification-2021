@@ -1,5 +1,5 @@
-# from transformers import DebertaTokenizer, DebertaModel
-from transformers import XLMRobertaTokenizer, XLMRobertaModel
+from transformers import DebertaTokenizer, DebertaModel
+# from transformers import RobertaTokenizer, RobertaModel
 from transformers import ViTModel
 import pandas as pd
 import logging
@@ -25,8 +25,8 @@ transformers_logger = logging.getLogger("transformers")
 transformers_logger.setLevel(logging.ERROR)
 
 MODEL_TYPE = "deberta"
-# PRETRAINED_PATH = 'microsoft/deberta-base'
-PRETRAINED_PATH = 'xlm-roberta-base'
+PRETRAINED_PATH = 'microsoft/deberta-base'
+# PRETRAINED_PATH = 'roberta-base'
 CV_PRETRAINED_PATH = 'facebook/deit-base-patch16-224'
 OUTPUT_PATH = './models/deberta_base_1/'
 MAX_SEQUENCE_LENGTH = 512
@@ -57,8 +57,11 @@ class MultiModalDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        claim_text, claim_image, document_text, document_image, category = self.data[idx+1]
-        return (claim_text, claim_image, document_text, document_image, torch.tensor(category))
+    #     claim_text, claim_image, document_text, document_image, category = self.data[idx+1]
+    #     return (claim_text, claim_image, document_text, document_image, torch.tensor(category))
+
+        claim_text, claim_image, document_text, document_image = self.data[idx+1]
+        return (claim_text, claim_image, document_text, document_image)
 
 
 if __name__ == '__main__':
@@ -66,7 +69,8 @@ if __name__ == '__main__':
     config = ast.literal_eval(open(model_path + '{}config'.format(sys.argv[2])).readline())
     set_seed(config['seed_value'])
 
-    df_val = pd.read_csv('../data/val.csv', index_col='Id')[['claim', 'claim_image', 'document', 'document_image', 'Category']]
+    # df_val = pd.read_csv('../data/val.csv', index_col='Id')[['claim', 'claim_image', 'document', 'document_image', 'Category']]
+    df_val = pd.read_csv('../data/test.csv', index_col='Id')[['claim', 'claim_image', 'document', 'document_image']]
     df_val['index'] = df_val.index
 
     category = {
@@ -85,13 +89,13 @@ if __name__ == '__main__':
         4: 'Refute'
     }
 
-    df_val['Label'] = df_val['Category'].map(category)
+    # df_val['Label'] = df_val['Category'].map(category)
 
     # load pretrained NLP model
-    # deberta_tokenizer = DebertaTokenizer.from_pretrained(PRETRAINED_PATH)
-    # deberta = DebertaModel.from_pretrained(PRETRAINED_PATH)
-    deberta_tokenizer = XLMRobertaTokenizer.from_pretrained(PRETRAINED_PATH)
-    deberta = XLMRobertaModel.from_pretrained(PRETRAINED_PATH)
+    deberta_tokenizer = DebertaTokenizer.from_pretrained(PRETRAINED_PATH)
+    deberta = DebertaModel.from_pretrained(PRETRAINED_PATH)
+    # deberta_tokenizer = RobertaTokenizer.from_pretrained(PRETRAINED_PATH)
+    # deberta = RobertaModel.from_pretrained(PRETRAINED_PATH)
     for param in deberta.parameters():
         param.requires_grad = False
 
@@ -107,7 +111,8 @@ if __name__ == '__main__':
     vit_model.to(device)
     fake_net.to(device)
 
-    val_dataset = MultiModalDataset(mode='val')
+    # val_dataset = MultiModalDataset(mode='val')
+    val_dataset = MultiModalDataset(mode='test')
     val_dataloader = DataLoader(val_dataset, batch_size=config['batch_size'], shuffle=False, num_workers=8)
 
     # testing
@@ -115,7 +120,8 @@ if __name__ == '__main__':
     fake_net.eval()
     total_loss = 0
     for loader_idx, item in tqdm(enumerate(val_dataloader), total=len(val_dataloader)):
-        claim_text, claim_image, document_text, document_image, label = item[0], item[1].to(device), item[2], item[3].to(device), item[4].to(device)
+        # claim_text, claim_image, document_text, document_image, label = item[0], item[1].to(device), item[2], item[3].to(device), item[4].to(device)
+        claim_text, claim_image, document_text, document_image = item[0], item[1].to(device), item[2], item[3].to(device)
 
         # transform sentences to embeddings via DeBERTa
         input_claim = deberta_tokenizer(claim_text, truncation=True, padding=True, return_tensors="pt").to(device)
@@ -139,10 +145,10 @@ if __name__ == '__main__':
 
         if len(y_pred) == 0:
             y_pred = predicted_output.cpu().detach().tolist()
-            y_true = label.tolist()
+            # y_true = label.tolist()
         else:
             y_pred += predicted_output.cpu().detach().tolist()
-            y_true += label.tolist()
+            # y_true += label.tolist()
 
     # f1 = round(f1_score(y_true, y_pred, average='weighted'), 5)
     

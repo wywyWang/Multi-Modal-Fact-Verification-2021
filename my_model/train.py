@@ -26,8 +26,9 @@ MODEL_TYPE = "deberta"
 PRETRAINED_PATH = 'microsoft/deberta-base'
 # PRETRAINED_PATH = 'xlm-roberta-base'
 CV_PRETRAINED_PATH = 'facebook/deit-base-patch16-224'
+# CV_PRETRAINED_PATH = 'facebook/dino-vitb8'
 MAX_SEQUENCE_LENGTH = 512
-device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
 
 
 def get_argument():
@@ -49,7 +50,7 @@ def get_argument():
                         help="learning rate")
     opt.add_argument("--epochs",
                         type=int,
-                        default=40,
+                        default=30,
                         help="epochs")
     config = vars(opt.parse_args())
     return config
@@ -137,6 +138,7 @@ if __name__ == '__main__':
 
     criterion = nn.CrossEntropyLoss()
     fake_net_optimizer = torch.optim.Adam(fake_net.parameters(), lr=config['lr'])
+    # scheduler = torch.optim.lr_scheduler.StepLR(fake_net_optimizer, step_size=5, gamma=0.1)
 
     deberta.to(device)
     vit_model.to(device)
@@ -163,11 +165,11 @@ if __name__ == '__main__':
             claim_text, claim_image, document_text, document_image, label = item[0], item[1].to(device), item[2], item[3].to(device), item[4].to(device)
 
             # transform sentences to embeddings via DeBERTa
-            input_claim = deberta_tokenizer(claim_text, truncation=True, padding=True, return_tensors="pt").to(device)
+            input_claim = deberta_tokenizer(claim_text, truncation=True, padding=True, return_tensors="pt", max_length=MAX_SEQUENCE_LENGTH).to(device)
             output_claim = deberta(**input_claim)
             output_claim_text = output_claim.last_hidden_state
 
-            input_document = deberta_tokenizer(document_text, truncation=True, padding=True, return_tensors="pt").to(device)
+            input_document = deberta_tokenizer(document_text, truncation=True, padding=True, return_tensors="pt", max_length=MAX_SEQUENCE_LENGTH).to(device)
             output_document = deberta(**input_document)
             output_document_text = output_document.last_hidden_state
 
@@ -188,6 +190,8 @@ if __name__ == '__main__':
             current_loss = loss.item()
             total_loss += current_loss
             pbar.set_description("Loss: {}".format(round(current_loss, 3)), refresh=True)
+        # scheduler.step()
+
 
         # testing
         y_pred, y_true = [], []
