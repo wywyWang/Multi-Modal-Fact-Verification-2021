@@ -44,11 +44,11 @@ for i in tqdm(range(len(df['deberta_base']))):
             prob.append(current_prob)
 
     category = prob.index(max(prob))
-    answer.append(inverse_category[category])
+    answer.append([i+1, inverse_category[category]])
 
 assert len(answer) == len(df['deberta_base'])
-answer = pd.DataFrame(answer, columns=['Category'])
-answer.to_csv('answer.csv')
+answer = pd.DataFrame(answer, columns=['Id', 'Category'])
+answer.to_csv('answer.csv', index=False)
 
 
 # df_val = pd.read_csv('./data/val.csv', index_col='Id')
