@@ -16,6 +16,10 @@ F1 averaged across the 5 categories. The final ranking would be based on the wei
 
 ## Method Overview
 <div align="left">
+<img src="model.png"/>
+</div>
+## Experiment Overview
+<div align="left">
 <img src="confusion_matrix.png"/>
 </div>
 ## Leaderboard
