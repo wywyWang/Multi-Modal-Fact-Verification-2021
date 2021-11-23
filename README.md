@@ -5,6 +5,20 @@ We won the **fifth place** and the technical report will be published in the nea
 ## Challenge
 The task is to find out support, insufficient-evidence and refute between given claims.
 
+## Usage
+- Train model
+    ```
+    bash single_model.sh
+    ```
+- Evaluate model
+    ```
+    python evaluate.py ${model_path}
+    ```
+- Ensemble models
+    ```
+    python ensemble.py
+    ```
+
 ## Dataset
 - Train set: 35,000, 7,000 for each class.
 - Validation set: 7,500, 1,500 for each class.
