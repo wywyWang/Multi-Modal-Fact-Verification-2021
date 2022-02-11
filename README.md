@@ -1,6 +1,6 @@
 # Official code of Team Yao at Multi-Modal-Fact-Verification-2022
 A Multi-Modal Fact Verification dataset released as part of the [De-Factify workshop in AAAI-22](https://aiisc.ai/defactify/).
-We won the **fifth place** and the technical report will be published in the near future.
+We won the **fifth place** and the technical report can be viewed [here](https://arxiv.org/abs/2201.11664).
 
 ## Challenge
 The task is to find out support, insufficient-evidence and refute between given claims.
