@@ -2,6 +2,9 @@
 A Multi-Modal Fact Verification dataset released as part of the [De-Factify workshop in AAAI-22](https://aiisc.ai/defactify/).
 We won the **fifth place** and the technical report can be viewed [here](https://arxiv.org/abs/2201.11664).
 
+## Updated News
+We propose the improved version, Pre-CoFactv2, winning the first prize at the [FACTIFY 2 Challenge](https://aiisc.ai/defactify2/factify.html). Please refer to the [new repo of Pre-CoFactv2](https://github.com/wwweiwei/Pre-CoFactv2-AAAI-2023) for more details.
+
 ## Challenge
 The task is to find out support, insufficient-evidence and refute between given claims.
 
